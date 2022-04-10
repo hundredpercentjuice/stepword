@@ -72,15 +72,7 @@ function App() {
   return (
     <div className={"App-container" + (colorBlind ? " color-blind" : "")}>
       <h1>
-        <span
-          style={{
-            color: difficulty > 0 ? "#e66" : "inherit",
-            fontStyle: difficulty > 1 ? "italic" : "inherit",
-          }}
-        >
-          hell
-        </span>
-        o wordl
+        Stepword Fives
       </h1>
       <div className="top-right">
         {page !== "game" ? (

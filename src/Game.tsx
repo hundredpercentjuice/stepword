@@ -4,6 +4,7 @@ import dictionary from "./dictionary.json";
 import { Clue, clue, describeClue, violation } from "./clue";
 import { Keyboard } from "./Keyboard";
 import targetList from "./targets.json";
+import * as $ from 'jquery';
 import {
   describeSeed,
   dictionarySet,
@@ -21,6 +22,33 @@ enum GameState {
   Playing,
   Won,
   Lost,
+}
+
+export const gameDayStoragePrefix = "game-day-";
+export const guessesDayStoragePrefix = "guesses-day-";
+export const numGuessesStorageKey = "num-guesses-day-";
+export const numSolvedStorageKey = "num-solved-day-"
+
+function useLocalStorage<T>(
+  key: string,
+  initial: T
+): [T, (value: T | ((t: T) => T)) => void] {
+  const [current, setCurrent] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initial;
+    } catch (e) {
+      return initial;
+    }
+  });
+  const setSetting = (value: T | ((t: T) => T)) => {
+    try {
+      const v = value instanceof Function ? value(current) : value;
+      setCurrent(v);
+      window.localStorage.setItem(key, JSON.stringify(v));
+    } catch (e) {}
+  };
+  return [current, setSetting];
 }
 
 interface GameProps {
@@ -82,9 +110,30 @@ function parseUrlGameNumber(): number {
   return gameNumber >= 1 && gameNumber <= 1000 ? gameNumber : 1;
 }
 
+
+function calc_to_next(steps: number): number{
+  return 1000 - (steps - (Math.trunc(steps / 1000) * 1000) )
+}
+
+function calc_available(steps: number): number{
+  return Math.trunc(steps/1000)
+}
+
 function Game(props: GameProps) {
-  const [gameState, setGameState] = useState(GameState.Playing);
-  const [guesses, setGuesses] = useState<string[]>([]);
+
+  let stateStorageKey = (gameDayStoragePrefix+seed);
+  let guessesStorageKey = (guessesDayStoragePrefix+seed);
+
+  const [gameState, setGameState] = useLocalStorage<GameState>(stateStorageKey, GameState.Playing);
+  const [guesses, setGuesses] = useLocalStorage<string[]>(guessesStorageKey, []);
+
+  const [steps, setSteps] = useState<number>(0);
+  const [num_guesses, set_num_guesses] = useLocalStorage<number>(numGuessesStorageKey, 0);
+  const [solved, set_solved] = useLocalStorage<number>(numSolvedStorageKey, 0);
+
+  const [to_next_guess, set_to_next_guess] = useState(calc_to_next(steps))
+  const [guesses_available, set_guesses_available] = useState(calc_available(steps))
+  
   const [currentGuess, setCurrentGuess] = useState<string>("");
   const [challenge, setChallenge] = useState<string>(initChallenge);
   const [wordLength, setWordLength] = useState(
@@ -102,6 +151,9 @@ function Game(props: GameProps) {
       ? `Invalid challenge string, playing random game.`
       : `Make your first guess!`
   );
+
+  hitFitbit();
+  
   const currentSeedParams = () =>
     `?seed=${seed}&length=${wordLength}&game=${gameNumber}`;
   useEffect(() => {
@@ -129,6 +181,15 @@ function Game(props: GameProps) {
     setGameState(GameState.Playing);
     setGameNumber((x) => x + 1);
   };
+  function hitFitbit(){
+    $.ajax({
+      url: 'https://www.imjs.dev/fitbit/steps_simple',
+      success:(data: any)=>{
+        setSteps(data);
+        set_to_next_guess(calc_to_next(data))
+        set_guesses_available(calc_available(data))
+      }
+  })}
 
   async function share(copiedHint: string, text?: string) {
     const url = seed
@@ -182,6 +243,11 @@ function Game(props: GameProps) {
         setHint("Not a valid word");
         return;
       }
+      if (num_guesses>=guesses_available){
+        setHint(`Out of guesses ${num_guesses} ${guesses_available} ${steps}`);
+        return;
+      }
+
       for (const g of guesses) {
         const c = clue(g, target);
         const feedback = violation(props.difficulty, c, currentGuess);
@@ -192,6 +258,7 @@ function Game(props: GameProps) {
       }
       setGuesses((guesses) => guesses.concat([currentGuess]));
       setCurrentGuess((guess) => "");
+      set_num_guesses(num_guesses+1);
 
       const gameOver = (verbed: string) =>
         `You ${verbed}! The answer was ${target.toUpperCase()}. (Enter to ${
@@ -201,6 +268,7 @@ function Game(props: GameProps) {
       if (currentGuess === target) {
         setHint(gameOver("won"));
         setGameState(GameState.Won);
+        set_solved(solved+1);
       } else if (guesses.length + 1 === props.maxGuesses) {
         setHint(gameOver("lost"));
         setGameState(GameState.Lost);
@@ -327,6 +395,13 @@ function Game(props: GameProps) {
           ? `${describeSeed(seed)} — length ${wordLength}, game ${gameNumber}`
           : "playing a random game"}
       </div>
+      <div className="Step-info">
+          Steps Taken: {steps} ({to_next_guess} till next guess)
+      </div>
+      <div className="Guess-info">
+          Guesses Used: {num_guesses}/{Math.trunc(steps/1000)}
+      </div>
+      <div className="Solved-info">Solved: </div>     
       <p>
         <button
           onClick={() => {
