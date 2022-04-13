@@ -401,7 +401,7 @@ function Game(props: GameProps) {
       <div className="Guess-info">
           Guesses Used: {num_guesses}/{Math.trunc(steps/1000)}
       </div>
-      <div className="Solved-info">Solved: </div>     
+      <div className="Solved-info">Solved: {solved}</div>     
       <p>
         <button
           onClick={() => {

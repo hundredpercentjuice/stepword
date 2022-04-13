@@ -49,7 +49,7 @@ function App() {
 
   useEffect(() => {
     document.body.className = dark ? "dark" : "";
-    if (urlParam("today") !== null || urlParam("todas") !== null) {
+    if (urlParam("seed") == null) {
       document.location = "?seed=" + todaySeed;
     }
     setTimeout(() => {
@@ -92,9 +92,6 @@ function App() {
           visibility: page === "game" ? "visible" : "hidden",
         }}
       >
-        <a href={seed ? "?random" : "?seed=" + todaySeed}>
-          {seed ? "Random" : "Today's"}
-        </a>
       </div>
       {page === "about" && <About />}
       {page === "settings" && (
